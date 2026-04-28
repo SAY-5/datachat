@@ -26,6 +26,8 @@ export interface PersistedMessage {
 
 export interface SessionDetail extends SessionSummary {
   messages: PersistedMessage[];
+  forked_from_session_id?: string | null;
+  forked_at_message_id?: string | null;
 }
 
 export interface Stats {
@@ -79,6 +81,12 @@ export const api = {
       method: "POST",
       headers: JSON_HEADERS,
       body: JSON.stringify({ dataset, title }),
+    }),
+  forkSession: (sourceId: string, anchorMessageId: string, title?: string) =>
+    http<SessionDetail>(`/v1/sessions/${sourceId}/fork`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ anchor_message_id: anchorMessageId, title }),
     }),
 };
 

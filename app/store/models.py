@@ -28,6 +28,11 @@ class Session(Base):
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
     dataset = Column(String(64), nullable=True)
     title = Column(String(256), nullable=True)
+    # Branching: forked sessions point at the session they were copied
+    # from, plus the message at which the fork happened. NULL on the
+    # original session.
+    forked_from_session_id = Column(String(32), ForeignKey("sessions.id"), nullable=True)
+    forked_at_message_id   = Column(String(32), nullable=True)
     messages = relationship(
         "Message", back_populates="session",
         order_by="Message.created_at", cascade="all,delete-orphan",

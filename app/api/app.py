@@ -57,6 +57,11 @@ class CreateMessageBody(BaseModel):
     content: str = Field(..., min_length=1, max_length=8192)
 
 
+class ForkSessionBody(BaseModel):
+    anchor_message_id: str = Field(..., min_length=1, max_length=64)
+    title: str | None = Field(default=None, max_length=256)
+
+
 def build_app(
     *,
     store: Store | None = None,
@@ -131,6 +136,8 @@ def build_app(
         return {
             "id": sess.id, "dataset": sess.dataset, "title": sess.title,
             "created_at": sess.created_at.isoformat(),
+            "forked_from_session_id": sess.forked_from_session_id,
+            "forked_at_message_id":   sess.forked_at_message_id,
             "messages": [
                 {
                     "id": m.id, "role": m.role, "content": m.content,
@@ -139,6 +146,32 @@ def build_app(
                     "created_at": m.created_at.isoformat(),
                 }
                 for m in sess.messages
+            ],
+        }
+
+    @app.post("/v1/sessions/{sid}/fork")
+    def fork_session(sid: str, body: ForkSessionBody):
+        try:
+            new = state["store"].fork_session(
+                source_id=sid,
+                up_to_message_id=body.anchor_message_id,
+                title=body.title,
+            )
+        except LookupError as e:
+            raise HTTPException(404, str(e)) from e
+        return {
+            "id": new.id, "dataset": new.dataset, "title": new.title,
+            "created_at": new.created_at.isoformat(),
+            "forked_from_session_id": new.forked_from_session_id,
+            "forked_at_message_id":   new.forked_at_message_id,
+            "messages": [
+                {
+                    "id": m.id, "role": m.role, "content": m.content,
+                    "code": m.code, "figure_json": m.figure_json,
+                    "elapsed_ms": m.elapsed_ms, "status": m.status,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in new.messages
             ],
         }
 

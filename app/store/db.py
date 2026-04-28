@@ -97,6 +97,72 @@ class Store:
             s.expunge(m)
             return m
 
+    # -- branching --------------------------------------------------------
+
+    def fork_session(
+        self,
+        source_id: str,
+        up_to_message_id: str,
+        *,
+        title: str | None = None,
+    ) -> models.Session:
+        """Create a new Session that copies messages of `source_id` up
+        to and including `up_to_message_id`. The new session inherits
+        the dataset and stores `forked_from_session_id` +
+        `forked_at_message_id` so the UI can render the lineage.
+
+        Used for 'try a different question from here' — the user picks
+        any past message, forks at it, and asks the assistant something
+        else without disturbing the original thread.
+
+        Raises LookupError if source is missing or anchor doesn't
+        belong to source."""
+        with self.session() as s:
+            src = s.get(models.Session, source_id)
+            if src is None:
+                raise LookupError(f"source session {source_id!r} not found")
+            anchor = s.get(models.Message, up_to_message_id)
+            if anchor is None or anchor.session_id != source_id:
+                raise LookupError(
+                    f"anchor {up_to_message_id!r} not in session {source_id!r}"
+                )
+            stmt = (
+                select(models.Message)
+                .where(models.Message.session_id == source_id)
+                .where(models.Message.created_at <= anchor.created_at)
+                .order_by(models.Message.created_at)
+            )
+            originals = list(s.execute(stmt).scalars().all())
+            new = models.Session(
+                dataset=src.dataset,
+                title=title or (src.title or "branch"),
+                forked_from_session_id=src.id,
+                forked_at_message_id=anchor.id,
+            )
+            s.add(new)
+            s.flush()
+            for m in originals:
+                s.add(models.Message(
+                    session_id=new.id,
+                    role=m.role,
+                    content=m.content,
+                    code=m.code,
+                    figure_json=m.figure_json,
+                    tokens_in=m.tokens_in,
+                    tokens_out=m.tokens_out,
+                    elapsed_ms=m.elapsed_ms,
+                    status=m.status,
+                ))
+            s.flush()
+            s.refresh(new)
+            _ = list(new.messages)
+            for m in new.messages:
+                s.expunge(m)
+            s.expunge(new)
+            return new
+
+    # -- runs -------------------------------------------------------------
+
     def add_run(
         self,
         *,
