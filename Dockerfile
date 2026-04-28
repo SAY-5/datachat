@@ -20,7 +20,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends libgomp1 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
+# pyproject references README.md via `readme = "..."`, so hatchling
+# wants both files present at build time.
+COPY pyproject.toml README.md ./
 RUN pip install --upgrade pip && pip install ".[openai,postgres]"
 
 COPY app ./app
