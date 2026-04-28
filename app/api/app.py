@@ -16,9 +16,9 @@ import json
 import os
 import time
 from collections import deque
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,14 +28,16 @@ from pydantic import BaseModel, Field
 from app.llm.base import LLMProvider, Message
 from app.llm.extract import extract_code
 from app.llm.mock import MockLLMProvider
-from app.sandbox import SandboxConfig, SandboxRunner
+from app.sandbox import SandboxRunner
 from app.store import Store
 from app.store.datasets import (
-    DEFAULT_DATA_DIR, Dataset, discover_datasets, ensure_demo_dataset,
+    DEFAULT_DATA_DIR,
+    Dataset,
+    discover_datasets,
+    ensure_demo_dataset,
 )
 
 from .sse import sse
-
 
 SYSTEM_PROMPT = (
     "You are a Python data-analysis assistant. The dataset is loaded into a "
@@ -194,7 +196,8 @@ def build_app(
         if not lats:
             return {"count": 0}
         lats_sorted = sorted(lats)
-        p = lambda q: lats_sorted[min(len(lats_sorted) - 1, int(q * len(lats_sorted)))]
+        def p(q):
+            return lats_sorted[min(len(lats_sorted) - 1, int(q * len(lats_sorted)))]
         return {
             "count": len(lats),
             "p50_ms": p(0.5),

@@ -13,4 +13,4 @@ def sse(event: str, data: Any) -> bytes:
     event on the empty line.
     """
     payload = json.dumps(data, ensure_ascii=False)
-    return f"event: {event}\ndata: {payload}\n\n".encode("utf-8")
+    return f"event: {event}\ndata: {payload}\n\n".encode()

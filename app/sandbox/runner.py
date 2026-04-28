@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -190,10 +191,8 @@ class SandboxRunner:
                 limit = getattr(resource, name, None)
                 if limit is None:
                     continue
-                try:
+                with contextlib.suppress(ValueError, OSError):
                     resource.setrlimit(limit, value)
-                except (ValueError, OSError):
-                    pass
 
         return _apply
 
