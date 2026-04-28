@@ -22,7 +22,14 @@ _HARNESS = Path(__file__).resolve().parent / "harness.py"
 @dataclass
 class SandboxConfig:
     cpu_seconds: int = 5
-    memory_bytes: int = 512 * 1024 * 1024
+    # 2 GiB virtual address space — enough headroom for pandas + numpy
+    # + plotly's combined mmap footprint on glibc Linux (where the
+    # interpreter alone reserves several hundred MB for thread stacks).
+    # macOS rejects RLIMIT_AS for non-root, so the runner treats every
+    # rlimit call as best-effort regardless. The CPU + wall-time +
+    # audit-hook + minimal-env defenses are the actual security
+    # boundary; AS is a safety net for "user code allocated 8 GB".
+    memory_bytes: int = 2 * 1024 * 1024 * 1024
     file_size_bytes: int = 16 * 1024 * 1024
     nproc: int = 16
     wall_seconds: float = 10.0
