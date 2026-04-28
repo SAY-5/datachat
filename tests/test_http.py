@@ -81,8 +81,12 @@ def test_full_streaming_loop_produces_chart(client):
     assert "code" in kinds
     assert "exec_result" in kinds
     assert "done" in kinds
-    exec_event = [e for e in events if e[0] == "exec_result"][0][1]
-    assert exec_event["ok"] is True
+    exec_event = next(e for e in events if e[0] == "exec_result")[1]
+    assert exec_event["ok"] is True, (
+        f"exec failed: error_class={exec_event.get('error_class')!r} "
+        f"error_message={exec_event.get('error_message')!r} "
+        f"stderr={exec_event.get('stderr', '')!r}"
+    )
     assert exec_event["figure"] is not None
     # Persistence: the assistant message lands in the session.
     detail = client.get(f"/v1/sessions/{sess['id']}").json()
