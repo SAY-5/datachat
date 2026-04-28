@@ -31,7 +31,13 @@ class SandboxConfig:
     # boundary; AS is a safety net for "user code allocated 8 GB".
     memory_bytes: int = 2 * 1024 * 1024 * 1024
     file_size_bytes: int = 16 * 1024 * 1024
-    nproc: int = 16
+    # RLIMIT_NPROC counts every thread the *user* already owns, not
+    # just the sandbox child's. On a busy CI runner the user can have
+    # 100+ threads alive before the sandbox even starts; OpenBLAS then
+    # fails to spawn its worker pool ("pthread_create failed for
+    # thread N of 4"). 512 keeps the fork-bomb defense useful while
+    # leaving room for the scientific-Python thread pools.
+    nproc: int = 512
     wall_seconds: float = 10.0
     output_truncate_bytes: int = 8192
     interpreter: str = field(default_factory=lambda: sys.executable)
@@ -165,6 +171,16 @@ class SandboxRunner:
             "PYTHONPATH": str(_HARNESS.parent),
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONUNBUFFERED": "1",
+            # Pin numerical libs to single-threaded operation. We're
+            # already running each request in its own subprocess; the
+            # OS scheduler will fan out across cores via process-level
+            # parallelism. Single-threaded BLAS also avoids the
+            # CI-runner failure mode where OpenBLAS exhausts the user
+            # pthread budget (RLIMIT_NPROC).
+            "OPENBLAS_NUM_THREADS": "1",
+            "OMP_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "NUMEXPR_NUM_THREADS": "1",
         }
         env.update(self.config.extra_env)
         return env
