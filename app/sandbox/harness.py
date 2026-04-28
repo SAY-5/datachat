@@ -1,14 +1,22 @@
 """Harness that runs *inside* the sandboxed subprocess.
 
 Responsibilities:
-  1. Install a sys.audit hook that refuses dangerous operations
-     (importing socket/subprocess, calling os.system/os.execv,
-     exec()/eval()/compile() on user-controlled strings).
-  2. Load the dataset CSV (if any) into a pandas DataFrame called
+  1. Install a sys.audit hook that refuses dangerous *runtime* events
+     (os.system, subprocess.Popen, socket.connect/bind, os.exec/spawn/
+     fork). These fire regardless of how the underlying module was
+     imported, so the audit hook is the right tool here.
+  2. For *imports*, override the user-globals' __import__ so every
+     import statement in user code goes through our gatekeeper —
+     even if the target module is already cached (which it typically
+     IS, because we pre-warm pandas+numpy+plotly, which transitively
+     load socket/urllib/os, before user code runs). PEP 578 audit
+     hooks for the 'import' event do NOT fire on sys.modules cache
+     hits, so we can't rely on them for blocking import names.
+  3. Load the dataset CSV (if any) into a pandas DataFrame called
      ``df`` and expose it to the user code's globals.
-  3. Compile + execute the user code in that restricted globals dict.
-  4. Capture the resulting ``result`` and ``fig`` values.
-  5. Serialize the result + Plotly figure JSON + stdout/stderr to a
+  4. Compile + execute the user code in the restricted globals dict.
+  5. Capture the resulting ``result`` and ``fig`` values.
+  6. Serialize the result + Plotly figure JSON + stdout/stderr to a
      known JSON file the parent reads back.
 
 The harness runs as a normal Python script with the parent process's
@@ -17,6 +25,7 @@ RLIMITs already in effect; nothing here can extend them.
 
 from __future__ import annotations
 
+import builtins
 import io
 import json
 import resource
@@ -63,14 +72,31 @@ def _install_audit_hook() -> None:
     def hook(event: str, args: tuple) -> None:
         if event in _FORBIDDEN_EVENTS:
             raise SandboxViolation(f"sandbox blocked event: {event}")
-        if event == "import":
-            # args[0] is the module name being imported.
-            mod = args[0] if args else ""
-            top = mod.split(".", 1)[0]
-            if top in _FORBIDDEN_MODULES:
-                raise SandboxViolation(f"sandbox blocked import: {mod}")
 
     sys.addaudithook(hook)
+
+
+def _make_restricted_import():
+    """Return an ``__import__`` replacement that blocks forbidden
+    module names. Installed in the user-code globals so every import
+    statement passes through it — including ones whose targets are
+    already in sys.modules from our prewarm."""
+    real_import = builtins.__import__
+
+    def restricted(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
+        top = name.split(".", 1)[0]
+        if top in _FORBIDDEN_MODULES:
+            raise SandboxViolation(f"sandbox blocked import: {name}")
+        # Also catch `from urllib import request` style: fromlist may
+        # name a forbidden subpackage. We only need to check the leaf
+        # names that are themselves submodule lookups.
+        if fromlist:
+            for sub in fromlist:
+                if sub in _FORBIDDEN_MODULES:
+                    raise SandboxViolation(f"sandbox blocked import: {name}.{sub}")
+        return real_import(name, globals, locals, fromlist, level)
+
+    return restricted
 
 
 def _prewarm() -> dict[str, object]:
@@ -150,9 +176,17 @@ def main(argv: list[str]) -> int:
     code = user_script.read_text(encoding="utf-8")
 
     # Per the prompt, user code should assign `result` and optionally
-    # `fig`. We expose `df` (the dataset) and a minimal helper module
-    # surface; pandas/numpy/plotly are imported on demand by the user.
-    g: dict[str, object] = {"__name__": "__main__", "df": df}
+    # `fig`. We expose `df` (the dataset) plus a __builtins__ dict
+    # whose __import__ has been replaced with our gatekeeper. Pandas/
+    # numpy/plotly are already cached so user-code `import pandas as
+    # pd` is a fast path; user-code `import socket` raises.
+    user_builtins = dict(vars(builtins))
+    user_builtins["__import__"] = _make_restricted_import()
+    g: dict[str, object] = {
+        "__name__": "__main__",
+        "__builtins__": user_builtins,
+        "df": df,
+    }
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
     payload: dict[str, object] = {"ok": False}
