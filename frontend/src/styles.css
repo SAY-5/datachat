@@ -1,0 +1,496 @@
+/* ----------------------------------------------------------------------
+   DataChat — editorial research-paper aesthetic.
+   Reference points: Observable.com notebooks, Pitch's slide editor,
+   Are.na's archive view, Zed editor's panels. The chat reads like a
+   typeset research log — Bodoni Moda display (high-contrast,
+   dramatic), IBM Plex Sans body, JetBrains Mono for code.
+   ---------------------------------------------------------------------- */
+
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,700;1,6..96,400&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  --bg:        #0c0c10;
+  --bg-2:      #131319;
+  --surface:   #191a22;
+  --surface-2: #22232c;
+  --line:      #2a2c37;
+  --line-2:    #383b48;
+  --rule:      #5a5d6e;        /* hairline rules in the editorial chrome */
+
+  --fg:        #ece7dd;
+  --fg-dim:    #9c9789;
+  --fg-muted:  #5a564b;
+
+  /* Burnt sienna — a single hot accent, used sparingly. */
+  --accent:    #d76040;
+  --accent-soft: rgba(215,96,64,0.16);
+  --accent-glow: rgba(215,96,64,0.30);
+  --user:      #6c8da6;          /* desaturated steel for the user */
+
+  --code-bg:   #08080c;
+  --ok:        #7fc18f;
+  --err:       #d77a6a;
+
+  --display: "Bodoni Moda", ui-serif, "Times New Roman", serif;
+  --sans:    "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+  --mono:    "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 24px; --r-6: 32px; --r-7: 48px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01";
+}
+
+/* Subtle grain — keeps the paper-like texture in a dark theme. */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: radial-gradient(circle at 1px 1px,
+    rgba(236,231,221,0.018) 1px, transparent 0);
+  background-size: 4px 4px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  z-index: 100;
+}
+
+button { font: inherit; color: inherit; }
+input, textarea, select { font: inherit; color: inherit; }
+
+.app { display: grid; grid-template-rows: 64px 1fr; height: 100vh; }
+
+/* ---------- topbar — masthead style --------------------------------- */
+
+header.topbar {
+  display: grid;
+  grid-template-columns: 280px 1fr auto;
+  align-items: center;
+  padding: 0 var(--r-5) 0 0;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  padding: 0 var(--r-5);
+  display: flex; align-items: baseline; gap: 12px;
+  border-right: 1px solid var(--line);
+  height: 100%;
+  align-self: stretch;
+  align-items: center;
+}
+.brand-mark {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  line-height: 1;
+}
+.brand-mark em { color: var(--accent); font-style: italic; }
+.brand-volume {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.thread-meta {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--fg-dim);
+  letter-spacing: -0.005em;
+}
+
+.topbar-meta {
+  display: flex; gap: 28px; align-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg-dim);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.topbar-meta b {
+  font-family: var(--display);
+  font-weight: 500;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  font-size: 18px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  margin-left: 8px;
+  vertical-align: -2px;
+}
+
+/* ---------- layout grid --------------------------------------------- */
+
+main {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+aside.sidebar {
+  border-right: 1px solid var(--line);
+  background: var(--bg-2);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-head {
+  padding: var(--r-4) var(--r-5);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  color: var(--fg);
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: border-color 120ms, color 120ms, background 120ms;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.btn.primary:hover { background: #b14e34; border-color: #b14e34; color: var(--fg); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.session-list { list-style: none; margin: 0; padding: 0; }
+.session-list li {
+  padding: var(--r-3) var(--r-5);
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 120ms ease;
+  display: grid;
+  gap: 4px;
+}
+.session-list li:hover { background: var(--surface); }
+.session-list li.active {
+  background: var(--surface);
+  position: relative;
+}
+.session-list li.active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--accent);
+}
+.session-list .title {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.session-list .meta {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- chat thread --------------------------------------------- */
+
+section.chat {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
+  background: var(--bg);
+}
+.thread {
+  overflow: auto;
+  padding: var(--r-7) var(--r-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-7);
+  background-image:
+    /* hairline divider rules between turns */
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 9999px
+    );
+}
+
+.thread-empty {
+  margin: 14vh auto 0;
+  text-align: center;
+  max-width: 64ch;
+}
+.thread-empty .eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: var(--r-3);
+}
+.thread-empty h1 {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 64px;
+  letter-spacing: -0.025em;
+  line-height: 0.96;
+  color: var(--fg);
+  margin: 0 0 var(--r-4);
+}
+.thread-empty h1 em { color: var(--accent); }
+.thread-empty p {
+  font-family: var(--display);
+  font-size: 18px;
+  font-style: normal;
+  color: var(--fg-dim);
+  margin: 0 auto;
+  max-width: 52ch;
+}
+.suggestions {
+  display: flex; gap: 10px; justify-content: center;
+  margin-top: var(--r-6);
+  flex-wrap: wrap;
+}
+.suggestions button {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--fg-dim);
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.suggestions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Editorial-style turn separator. Each msg is preceded by a
+   horizontal rule with a small kicker on the left. */
+.turn {
+  position: relative;
+  max-width: 780px;
+  margin: 0 auto;
+  width: 100%;
+}
+.turn::before {
+  content: attr(data-kicker);
+  position: absolute;
+  left: 0; top: -28px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  padding-right: var(--r-2);
+  background: var(--bg);
+}
+.turn::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: -16px;
+  height: 1px;
+  background: var(--line);
+}
+.turn:first-child::after,
+.turn:first-child::before { display: none; }
+
+.turn.user .body {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  color: var(--fg);
+}
+.turn.user .body::before {
+  content: "“";
+  font-family: var(--display);
+  font-size: 56px;
+  line-height: 0;
+  color: var(--accent);
+  vertical-align: -16px;
+  margin-right: 6px;
+}
+
+.turn.assistant .body {
+  font-family: var(--display);
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--fg);
+  letter-spacing: -0.005em;
+}
+
+/* code block: looks like a typeset listing */
+pre.code-block {
+  margin: var(--r-4) 0 0;
+  padding: var(--r-4) var(--r-5);
+  background: var(--code-bg);
+  border-left: 2px solid var(--accent);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fg);
+  overflow-x: auto;
+  white-space: pre;
+  position: relative;
+}
+pre.code-block::before {
+  content: "Listing — Python";
+  position: absolute;
+  top: -10px; left: var(--r-5);
+  background: var(--bg);
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.exec-meta {
+  display: flex; gap: 18px; align-items: center;
+  margin-top: var(--r-3);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.pill.ok { color: var(--ok); border-color: var(--ok); }
+.pill.err { color: var(--err); border-color: var(--err); }
+
+.figure-wrap {
+  margin-top: var(--r-4);
+  border: 1px solid var(--line);
+  border-radius: 0;             /* squared, like a journal plate */
+  background: var(--surface);
+  padding: var(--r-3);
+  position: relative;
+}
+.figure-wrap::after {
+  content: "Figure";
+  position: absolute;
+  top: -10px; left: var(--r-3);
+  background: var(--bg);
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.error-box {
+  margin-top: var(--r-3);
+  padding: 12px 16px;
+  background: rgba(215,122,106,0.08);
+  border-left: 2px solid var(--err);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--err);
+  white-space: pre-wrap;
+}
+
+/* ---------- composer ------------------------------------------------ */
+
+.composer {
+  padding: var(--r-4) var(--r-7);
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+  display: grid;
+  gap: var(--r-3);
+}
+.composer-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  width: 100%;
+  display: grid;
+  gap: var(--r-2);
+}
+.composer textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--fg);
+  font-family: var(--display);
+  font-size: 18px;
+  font-style: italic;
+  line-height: 1.4;
+  resize: vertical;
+}
+.composer textarea:focus { outline: none; border-color: var(--accent); }
+.composer-row {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.dataset-pick {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+  display: flex; align-items: center; gap: 8px;
+  letter-spacing: 0.02em;
+}
+.dataset-pick select {
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.loading-bar {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 200% 100%;
+  animation: slide 1.4s ease infinite;
+}
+@keyframes slide {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }

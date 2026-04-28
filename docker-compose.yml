@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: datachat
+      POSTGRES_USER: datachat
+      POSTGRES_PASSWORD: datachat
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datachat -d datachat"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  datachat:
+    build: .
+    environment:
+      DATACHAT_DSN: postgresql+psycopg://datachat:datachat@postgres:5432/datachat
+      DATACHAT_DATA_DIR: /srv/data
+      DATACHAT_CORS: http://localhost:5173,http://localhost:8080
+      DATACHAT_LLM_PROVIDER: ${DATACHAT_LLM_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/srv/data
+
+volumes:
+  pgdata:
+  data:
