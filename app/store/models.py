@@ -70,5 +70,22 @@ class Run(Base):
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
 
 
+class PinnedChart(Base):
+    """A user-pinned chart from an assistant message. Lives on the
+    session, but the side-by-side gallery is global so a researcher
+    can compare charts pinned across sessions."""
+
+    __tablename__ = "pinned_charts"
+    id = Column(String(32), primary_key=True, default=_new_id)
+    session_id = Column(String(32), ForeignKey("sessions.id", ondelete="CASCADE"),
+                        nullable=False)
+    message_id = Column(String(32), ForeignKey("messages.id", ondelete="CASCADE"),
+                        nullable=False)
+    title = Column(String(256), nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+
+
 Index("ix_messages_session_created", Message.session_id, Message.created_at)
 Index("ix_sessions_created_desc", Session.created_at.desc())
+Index("ix_pinned_charts_session", PinnedChart.session_id, PinnedChart.created_at.desc())

@@ -12,6 +12,22 @@ from sqlalchemy.orm import Session, sessionmaker
 from . import models
 
 
+def _user_question_for(s: Session, asst: models.Message) -> str | None:
+    """Walk back from an assistant message to the prior user message
+    in the same session. Useful in the gallery view: 'this chart
+    answered: <question>'."""
+    stmt = (
+        select(models.Message)
+        .where(models.Message.session_id == asst.session_id)
+        .where(models.Message.created_at < asst.created_at)
+        .where(models.Message.role == "user")
+        .order_by(models.Message.created_at.desc())
+        .limit(1)
+    )
+    prev = s.execute(stmt).scalar_one_or_none()
+    return prev.content if prev is not None else None
+
+
 @dataclass
 class Store:
     """Simple repo-style wrapper. The store is held by the FastAPI
@@ -160,6 +176,89 @@ class Store:
                 s.expunge(m)
             s.expunge(new)
             return new
+
+    # -- pinned charts ----------------------------------------------------
+
+    def pin_chart(
+        self,
+        session_id: str,
+        message_id: str,
+        *,
+        title: str | None = None,
+        note: str | None = None,
+    ) -> models.PinnedChart:
+        """Pin an assistant message's figure to the gallery. Does not
+        copy the figure — the gallery view joins back to messages.
+        Idempotent on (message_id) — pinning twice updates title/note."""
+        with self.session() as s:
+            existing = s.execute(
+                select(models.PinnedChart).where(models.PinnedChart.message_id == message_id)
+            ).scalar_one_or_none()
+            if existing is not None:
+                if title is not None:
+                    existing.title = title
+                if note is not None:
+                    existing.note = note
+                s.add(existing)
+                s.flush()
+                s.refresh(existing)
+                s.expunge(existing)
+                return existing
+            msg = s.get(models.Message, message_id)
+            if msg is None or msg.session_id != session_id:
+                raise LookupError(f"message {message_id!r} not in session {session_id!r}")
+            if not msg.figure_json:
+                raise LookupError(f"message {message_id!r} has no figure to pin")
+            pin = models.PinnedChart(
+                session_id=session_id,
+                message_id=message_id,
+                title=title,
+                note=note,
+            )
+            s.add(pin)
+            s.flush()
+            s.refresh(pin)
+            s.expunge(pin)
+            return pin
+
+    def unpin_chart(self, pin_id: str) -> bool:
+        with self.session() as s:
+            row = s.get(models.PinnedChart, pin_id)
+            if row is None:
+                return False
+            s.delete(row)
+            return True
+
+    def list_pinned(self, session_id: str | None = None,
+                    limit: int = 100) -> list[dict]:
+        """Return pins joined with their message's figure_json + dataset.
+        Returned as plain dicts so the API can JSON them straight back."""
+        with self.session() as s:
+            stmt = select(
+                models.PinnedChart, models.Message, models.Session,
+            ).join(
+                models.Message, models.PinnedChart.message_id == models.Message.id,
+            ).join(
+                models.Session, models.PinnedChart.session_id == models.Session.id,
+            ).order_by(models.PinnedChart.created_at.desc()).limit(limit)
+            if session_id is not None:
+                stmt = stmt.where(models.PinnedChart.session_id == session_id)
+            out: list[dict] = []
+            for pin, msg, sess in s.execute(stmt).all():
+                out.append({
+                    "id": pin.id,
+                    "session_id": pin.session_id,
+                    "message_id": pin.message_id,
+                    "title": pin.title,
+                    "note": pin.note,
+                    "created_at": pin.created_at.isoformat(),
+                    "session_title": sess.title,
+                    "dataset": sess.dataset,
+                    "figure_json": msg.figure_json,
+                    "code": msg.code,
+                    "user_question": _user_question_for(s, msg),
+                })
+            return out
 
     # -- runs -------------------------------------------------------------
 

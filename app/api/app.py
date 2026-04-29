@@ -64,6 +64,12 @@ class ForkSessionBody(BaseModel):
     title: str | None = Field(default=None, max_length=256)
 
 
+class PinChartBody(BaseModel):
+    message_id: str = Field(..., min_length=1, max_length=64)
+    title: str | None = Field(default=None, max_length=256)
+    note: str | None = Field(default=None, max_length=2048)
+
+
 def build_app(
     *,
     store: Store | None = None,
@@ -176,6 +182,35 @@ def build_app(
                 for m in new.messages
             ],
         }
+
+    @app.post("/v1/sessions/{sid}/pins")
+    def pin_chart(sid: str, body: PinChartBody):
+        try:
+            pin = state["store"].pin_chart(
+                session_id=sid,
+                message_id=body.message_id,
+                title=body.title,
+                note=body.note,
+            )
+        except LookupError as e:
+            raise HTTPException(404, str(e)) from e
+        return {
+            "id": pin.id, "session_id": pin.session_id,
+            "message_id": pin.message_id,
+            "title": pin.title, "note": pin.note,
+            "created_at": pin.created_at.isoformat(),
+        }
+
+    @app.delete("/v1/pins/{pin_id}")
+    def unpin_chart(pin_id: str):
+        ok = state["store"].unpin_chart(pin_id)
+        if not ok:
+            raise HTTPException(404, "pin not found")
+        return {"ok": True}
+
+    @app.get("/v1/pins")
+    def list_pins(session_id: str | None = None, limit: int = 100):
+        return {"items": state["store"].list_pinned(session_id=session_id, limit=limit)}
 
     @app.post("/v1/sessions/{sid}/messages")
     async def post_message(sid: str, body: CreateMessageBody):
